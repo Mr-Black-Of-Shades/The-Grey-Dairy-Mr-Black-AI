@@ -83,29 +83,40 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if episode["price"] > 0 and not is_episode_unlocked(user["id"], next_episode_id):
 
-        # 🔥 mark hesitation
-        update_user_behavior(
-            user_id=user["id"],
-            drop_off="payment"
-        )
+    # 🔥 mark hesitation
+    update_user_behavior(
+        user_id=user["id"],
+        drop_off="payment"
+    )
 
-        text = """Some truths are not meant to be free.
+    # 🧠 AI pressure
+    state_line = generate_state_line("HESITANT")
+    await context.bot.send_message(chat_id, state_line)
 
-Unlock this episode: ₹199
+    # 🔥 first payment optimization
+    if next_episode_id == 2:
+        episode["price"] = 49
+
+    price = episode["price"]
+
+    text = f"""Some truths are not meant to be free.
+
+Unlock this episode: ₹{price}
 """
 
-        keyboard = [
-            [InlineKeyboardButton("🔓 Continue (₹199)", callback_data=f"pay_{next_episode_id}")],
-            [InlineKeyboardButton("👁 See what you missed (₹49)", callback_data=f"micro_{next_episode_id}")]
-        ]
+    keyboard = [
+        [InlineKeyboardButton(f"🔓 Continue (₹{price})", callback_data=f"pay_{next_episode_id}")],
+        [InlineKeyboardButton("👁 See what you missed (₹49)", callback_data=f"micro_{next_episode_id}")]
+    ]
 
-        await context.bot.send_message(
-            chat_id,
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+    await context.bot.send_message(
+        chat_id,
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
-        return
+    return
+
 
     # ================= SEND EPISODE =================
 
