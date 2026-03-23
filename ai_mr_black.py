@@ -25,7 +25,12 @@ def _call_openrouter(messages):
 
         data = res.json()
 
-        return data["choices"][0]["message"]["content"]
+
+        if "choices" in data:
+            return data["choices"][0]["message"]["content"]
+    
+        return "Something feels... off."
+        
 
     except Exception as e:
         print("AI ERROR:", e)
