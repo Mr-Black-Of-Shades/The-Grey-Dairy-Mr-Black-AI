@@ -1,20 +1,7 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
 
-from supabase_client import supabase
-from episode_service import (
-    get_episode_content,
-    get_episode,
-    is_episode_unlocked,
-    get_user_current_episode,
-    update_user_episode
-)
-from sender import send_episode
-from ai_mr_black import (
-    generate_line,
-    generate_voice_line,
-    generate_upsell_line
-)
+from ai_mr_black import generate_voice_line
 
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -24,20 +11,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = query.message.chat_id
     data = query.data
-
-    # ================= GET USER =================
-    user_res = supabase.table("users")\
-        .select("*")\
-        .eq("telegram_id", str(chat_id))\
-        .limit(1)\
-        .execute()
-
-    if not user_res.data:
-        await context.bot.send_message(chat_id, "Something went wrong.")
-        return
-
-    user = user_res.data[0]
-    user_id = user["id"]
 
     # ================= SIDE STORY =================
     if data == "side_story":
@@ -52,76 +25,24 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ================= SKIP =================
     if data == "skip":
-        await context.bot.send_message(chat_id, "Some truths don’t wait forever.")
-        return
-
-    # ================= NEXT EPISODE =================
-    current_episode = get_user_current_episode(chat_id)
-    next_episode = current_episode + 1
-
-    episode = get_episode(next_episode)
-
-    if not episode:
-        await context.bot.send_message(chat_id, "Nothing more… yet.")
-        return
-
-    price = episode.get("price", 0)
-
-    # ================= CHECK UNLOCK =================
-    unlocked = is_episode_unlocked(user_id, next_episode)
-
-    # ================= LOCKED FLOW =================
-    if price > 0 and not unlocked:
-
-        upsell_line = generate_upsell_line()
-        await context.bot.send_message(chat_id, upsell_line)
-
-        payment_link = f"https://your-payment-link.com/pay?episode={next_episode}"
-
-        keyboard = [
-            [InlineKeyboardButton(f"Unlock ₹{price}", url=payment_link)],
-            [InlineKeyboardButton("Maybe later", callback_data="skip")]
-        ]
-
         await context.bot.send_message(
             chat_id,
-            "This part isn’t free.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "Some truths don’t wait forever."
         )
         return
 
-    # ================= UNLOCKED FLOW =================
-
-    # update episode pointer (clean function)
-    update_user_episode(chat_id, next_episode)
-
-    # AI transition
-    line = generate_line("User is going deeper into the story.")
-    await context.bot.send_message(chat_id, line)
-
-    # send episode content
-    content = get_episode_content(next_episode)
-
-    if not content:
-        await context.bot.send_message(chat_id, "Something is missing…")
-        return
-
-    await send_episode(context.bot, chat_id, content)
-
-    # ================= MULTI-VOICE TRIGGER =================
-    if next_episode == 2:
-
-        voice_line = generate_voice_line(
-            "Unknown Voice",
-            "Reveal that someone else experienced the same moment differently."
-        )
-
-        keyboard = [
-            [InlineKeyboardButton("See her side", callback_data="side_story")]
-        ]
-
+    # ================= PAYMENT (PLACEHOLDER) =================
+    if data.startswith("pay_"):
         await context.bot.send_message(
             chat_id,
-            voice_line,
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "Payment system coming next..."
         )
+        return
+
+    # ================= MICRO (PLACEHOLDER) =================
+    if data.startswith("micro_"):
+        await context.bot.send_message(
+            chat_id,
+            "This part isn’t fully visible yet..."
+        )
+        return
