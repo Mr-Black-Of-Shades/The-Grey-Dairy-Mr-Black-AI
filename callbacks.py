@@ -13,11 +13,14 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = query.message.chat_id
 
-    user_res = supabase.table("users")\
-        .select("id")\
-        .eq("telegram_id", str(chat_id))\
-        .limit(1)\
-        .execute()
+    try:
+        user_res = supabase.table("users")\
+            .select("id")\
+            .eq("telegram_id", str(chat_id))\
+            .limit(1)\
+            .execute()
+    except:
+        return
     
     if not user_res.data:
         return
@@ -60,7 +63,12 @@ Unlock her side: ₹49
     # ================= PAYMENT =================
     if data.startswith("pay_"):
 
-        track_event(user_id, "click_pay", {"button": data})
+        episode_id = data.replace("pay_", "")
+
+        track_event(user_id, "click_pay", {
+            "episode_id": episode_id,
+            "button": data
+        })
         
         # 🔥 AI upsell before payment
         upsell = generate_upsell_line()
