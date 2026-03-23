@@ -36,7 +36,8 @@ def unlock_episode(user_id, episode_id):
     if is_episode_unlocked(user_id, episode_id):
         return True
 
-    res = supabase.table("user_progress").insert({
+
+    res = supabase.table("user_progress").upsert({
         "user_id": user_id,
         "episode_id": episode_id,
         "unlocked": True
