@@ -1,5 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+import asyncio
 
 from user_service import (
     get_or_create_user,
@@ -24,13 +25,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ behavior fetch
     behavior = get_user_behavior(user["id"])
 
+    # 👇 NEW USER FIX
+    if not behavior:
+        update_user_behavior(user["id"])
+        behavior = get_user_behavior(user["id"])
+
     # ✅ state detect
     state = get_user_state(user, behavior)
 
     # ✅ AI state line (NEW)
     intro = generate_state_line(state)
     await context.bot.send_message(chat_id, intro)
-
+    
+    await asyncio.sleep(1.2)  # 👈 delay
+    
     hook = generate_line("Make user curious")
     await context.bot.send_message(chat_id, hook)
 
@@ -51,7 +59,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id,
-        "Continue?",
+        "You can stop here… or continue.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -119,6 +127,8 @@ Unlock this episode: ₹{price}
     content = get_episode_content(next_episode_id)
 
     await send_episode(context.bot, chat_id, content)
+    
+    await asyncio.sleep(1)  # 👈 feels like thinking
 
     # ✅ update episode in DB
     update_user_episode(chat_id, next_episode_id)
