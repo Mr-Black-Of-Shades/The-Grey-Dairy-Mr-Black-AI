@@ -49,7 +49,7 @@ def get_user_behavior(user_id):
 
 # ✅ USER STATE LOGIC
 def get_user_state(user, behavior):
-    if user["total_spent"] > 0:
+    if user.get("total_spent", 0) > 0:
         return "BUYER"
     
     if behavior and behavior.get("drop_off_point") == "payment":
