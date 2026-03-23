@@ -106,3 +106,39 @@ def generate_reengagement_line():
 User has been inactive and left mid-story.
 Bring them back with tension.
 """)
+
+
+
+# ================= STATE-BASED AI =================
+
+def generate_state_line(state):
+
+    if state == "CURIOUS":
+        return generate_line("""
+User just entered the story.
+Make them feel like they are missing something deeper.
+""")
+
+    elif state == "HOOKED":
+        return generate_line("""
+User is already engaged in story.
+Push them forward subtly. Make stopping feel incomplete.
+""")
+
+    elif state == "HESITANT":
+        return generate_line("""
+User stopped at payment.
+Apply psychological pressure. Make them feel they stopped at the wrong moment.
+""")
+
+    elif state == "BUYER":
+        return generate_line("""
+User has already paid.
+Make them feel special and continue deeper.
+""")
+
+    elif state == "DORMANT":
+        return generate_line("""
+User left the story midway.
+Bring them back with tension and curiosity.
+""")
