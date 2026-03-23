@@ -59,3 +59,4 @@ def get_user_state(user, behavior):
         return "HOOKED"
     
     return "CURIOUS"
+
