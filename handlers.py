@@ -39,7 +39,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(chat_id, intro)
     
-    await asyncio.sleep(1.2)  # 👈 delay
+    await asyncio.sleep(1.2)
+
+    await context.bot.send_chat_action(chat_id, "typing")  # 👈 ADD THIS
     
     hook = generate_line("Make user curious")
     await context.bot.send_message(chat_id, hook)
@@ -97,8 +99,10 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # 🧠 AI pressure
+        await context.bot.send_chat_action(chat_id, "typing")
         state_line = generate_state_line("HESITANT")
         await context.bot.send_message(chat_id, state_line)
+        await asyncio.sleep(0.8)  # 👈 ADD THIS
 
         # 🔥 first payment optimization
         if next_episode_id == 2:
@@ -106,7 +110,9 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         price = episode["price"]
 
-        text = f"""Some truths are not meant to be free.
+        text = f"""Some truths were never meant for everyone.
+
+You’ve reached the part most people avoid.
 
 Unlock this episode: ₹{price}
 """
@@ -150,9 +156,13 @@ Unlock this episode: ₹{price}
     behavior = get_user_behavior(user["id"])
     state = get_user_state(user, behavior)
 
-    state_line = generate_state_line(state)
+    await context.bot.send_chat_action(chat_id, "typing")
 
+    state_line = generate_state_line(state)
     await context.bot.send_message(chat_id, state_line)
+
+    await asyncio.sleep(0.5)
+    await context.bot.send_chat_action(chat_id, "typing")
 
     # ================= CONTINUE BUTTON =================
 
