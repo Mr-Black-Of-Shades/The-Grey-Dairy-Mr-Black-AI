@@ -69,3 +69,16 @@ def update_user_episode(telegram_id, episode_id):
         .update({"current_episode": episode_id})\
         .eq("telegram_id", str(telegram_id))\
         .execute()
+
+
+# ================= GET EPISODE CONTENT =================
+
+def get_episode_content(episode_id):
+
+    res = supabase.table("episode_content")\
+        .select("*")\
+        .eq("episode_id", episode_id)\
+        .order("sequence")\
+        .execute()
+
+    return res.data if res.data else []
