@@ -12,6 +12,7 @@ from user_service import (
 from episode_service import get_episode_content
 from episode_service import get_episode, is_episode_unlocked, update_user_episode
 from sender import send_episode
+from event_service import track_event
 
 from ai_mr_black import generate_line, generate_state_line
 
@@ -21,6 +22,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     user = get_or_create_user(chat_id)
+    track_event(user["id"], "session_start")
 
     # ✅ behavior fetch
     behavior = get_user_behavior(user["id"])
@@ -51,6 +53,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     content = get_episode_content(episode_id)
 
     await send_episode(context.bot, chat_id, content)
+
+    track_event(user["id"], "episode_view", {
+        "episode_id": episode_id
+    })
 
     # ✅ track behavior
     update_user_behavior(
@@ -104,6 +110,10 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id, state_line)
         await asyncio.sleep(0.8)  # 👈 ADD THIS
 
+        track_event(user["id"], "hit_paywall", {
+            "episode_id": next_episode_id
+        })
+
         # 🔥 first payment optimization
         if next_episode_id == 2:
             episode["price"] = 49
@@ -135,6 +145,10 @@ Unlock this episode: ₹{price}
     content = get_episode_content(next_episode_id)
 
     await send_episode(context.bot, chat_id, content)
+
+    track_event(user["id"], "episode_view", {
+        "episode_id": next_episode_id
+    })
     
     await asyncio.sleep(1)  # 👈 feels like thinking
 
