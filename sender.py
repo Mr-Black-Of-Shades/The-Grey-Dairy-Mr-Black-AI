@@ -6,7 +6,7 @@ async def send_episode(bot, chat_id, content):
             await bot.send_message(chat_id, item["content"])
 
         elif item["type"] == "photo":
-            await bot.send_photo(chat_id, item["content"])
+            await bot.send_photo(chat_id, photo=item["content"])
 
         elif item["type"] == "video":
-            await bot.send_video(chat_id, item["content"])
+            await bot.send_video(chat_id, video=item["content"])
