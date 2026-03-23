@@ -34,7 +34,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     state = get_user_state(user, behavior)
 
     # ✅ AI state line (NEW)
+    await context.bot.send_chat_action(chat_id, "typing")
     intro = generate_state_line(state)
+
     await context.bot.send_message(chat_id, intro)
     
     await asyncio.sleep(1.2)  # 👈 delay
