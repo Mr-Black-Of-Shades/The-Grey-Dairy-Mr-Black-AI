@@ -6,6 +6,7 @@ def get_or_create_user(telegram_id):
     res = supabase.table("users")\
         .select("*")\
         .eq("telegram_id", str(telegram_id))\
+        .limit(1)\
         .execute()
 
     if res.data:
@@ -39,9 +40,11 @@ def update_user_behavior(user_id, episode_id=None, drop_off=None):
 
 # ✅ Get behavior
 def get_user_behavior(user_id):
+
     res = supabase.table("user_behavior") \
         .select("*") \
         .eq("user_id", user_id) \
+        .limit(1) \
         .execute()
     
     return res.data[0] if res.data else None
