@@ -7,6 +7,7 @@ from supabase_client import supabase
 
 from episode_service import get_episode, unlock_episode, get_episode_content
 from sender import send_episode
+from user_service import update_user_behavior
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -70,6 +71,12 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         # free story
         unlock_episode(user_id, side_episode_id)
+
+        update_user_behavior(
+            user_id=user_id,
+            episode_id=side_episode_id,
+            drop_off="side_story"
+        )
     
         track_event(user_id, "side_story_unlock", {
             "episode_id": side_episode_id,
@@ -80,6 +87,14 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         content = get_episode_content(side_episode_id)
         
         await send_episode(context.bot, chat_id, content)
+
+        await context.bot.send_message(
+            chat_id,
+            "Now… back to where we were.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Continue", callback_data="next")]
+            ])
+        )
     
         return
 
