@@ -101,7 +101,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ================= PAYMENT =================
     if data.startswith("pay_"):
 
-        episode_id = data.replace("pay_", "")
+        episode_id = int(data.replace("pay_", ""))
 
         track_event(user_id, "click_pay", {
             "episode_id": episode_id,
