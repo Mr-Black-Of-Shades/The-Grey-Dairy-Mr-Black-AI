@@ -9,12 +9,13 @@ from user_service import (
     update_user_behavior
 )
 
-from episode_service import get_episode_content
+from episode_service import get_episode_content, get_side_stories
 from episode_service import get_episode, is_episode_unlocked, update_user_episode
 from sender import send_episode
 from event_service import track_event
 
 from ai_mr_black import generate_line, generate_state_line
+
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -178,12 +179,27 @@ Unlock this episode: ₹{price}
     await asyncio.sleep(0.5)
     await context.bot.send_chat_action(chat_id, "typing")
 
-    # ================= CONTINUE BUTTON =================
 
-    keyboard = [[InlineKeyboardButton("Continue", callback_data="next")]]
+    # ================= SIDE STORIES =================
 
+    side_stories = get_side_stories(next_episode_id)
+    
+    buttons = []
+    
+    # continue button always
+    buttons.append([InlineKeyboardButton("Continue", callback_data="next")])
+    
+    # add side stories if exist
+    for side in side_stories:
+        buttons.append([
+            InlineKeyboardButton(
+                f"👁️ {side['title']} (₹{side['price']})",
+                callback_data=f"side_{side['id']}"
+            )
+        ])
+    
     await context.bot.send_message(
         chat_id,
-        "You can stop here… or continue.",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "You can stop here… or explore more.",
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
