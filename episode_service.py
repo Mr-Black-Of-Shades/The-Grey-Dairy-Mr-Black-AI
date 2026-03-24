@@ -83,3 +83,16 @@ def get_episode_content(episode_id):
         .execute()
 
     return res.data if res.data else []
+
+
+# ================= GET SIDE STORIES =================
+
+def get_side_stories(parent_episode_id):
+
+    res = supabase.table("episodes")\
+        .select("*")\
+        .eq("parent_episode_id", parent_episode_id)\
+        .eq("type", "side")\
+        .execute()
+
+    return res.data if res.data else []
