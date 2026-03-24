@@ -5,7 +5,7 @@ from ai_mr_black import generate_voice_line, generate_upsell_line
 from event_service import track_event
 from supabase_client import supabase
 
-from episode_service import get_episode, unlock_episode
+from episode_service import get_episode, unlock_episode, get_episode_content
 from sender import send_episode
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,13 +76,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "character_id": episode["character_id"]
         })
     
-        content = supabase.table("episode_content")\
-            .select("*")\
-            .eq("episode_id", side_episode_id)\
-            .order("sequence")\
-            .execute()
-    
-        await send_episode(context.bot, chat_id, content.data)
+
+        content = get_episode_content(side_episode_id)
+        
+        await send_episode(context.bot, chat_id, content)
     
         return
 
