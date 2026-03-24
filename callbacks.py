@@ -5,6 +5,8 @@ from ai_mr_black import generate_voice_line, generate_upsell_line
 from event_service import track_event
 from supabase_client import supabase
 
+from episode_service import get_episode, unlock_episode
+from sender import send_episode
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -29,35 +31,59 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = query.data
 
-    # ================= SIDE STORY (UPGRADED) =================
-    if data == "side_story":
-
-        text = """She remembers it very differently.
-
-You’re only hearing one version.
-
-Unlock her side: ₹49
-"""
-        track_event(user_id, "side_story_interest")
-
-        keyboard = [
-            [InlineKeyboardButton("Unlock her side (₹49)", callback_data="pay_side")],
-            [InlineKeyboardButton("Ignore", callback_data="skip")]
-        ]
-
-        await context.bot.send_message(
-            chat_id,
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-
+   
     # ================= SKIP =================
     if data == "skip":
         await context.bot.send_message(
             chat_id,
             "Some truths don’t wait forever."
         )
+        return
+
+
+    # ================= SIDE STORY CLICK =================
+    if data.startswith("side_"):
+    
+        side_episode_id = int(data.split("_")[1])
+    
+        episode = get_episode(side_episode_id)
+    
+        # track click
+        track_event(user_id, "side_story_click", {
+            "episode_id": side_episode_id,
+            "character_id": episode["character_id"]
+        })
+    
+        # if paid
+        if episode["price"] > 0:
+            await context.bot.send_message(
+                chat_id,
+                f"Unlock this story: ₹{episode['price']}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton(
+                        f"🔓 Unlock (₹{episode['price']})",
+                        callback_data=f"pay_{side_episode_id}"
+                    )]
+                ])
+            )
+            return
+    
+        # free story
+        unlock_episode(user_id, side_episode_id)
+    
+        track_event(user_id, "side_story_unlock", {
+            "episode_id": side_episode_id,
+            "character_id": episode["character_id"]
+        })
+    
+        content = supabase.table("episode_content")\
+            .select("*")\
+            .eq("episode_id", side_episode_id)\
+            .order("sequence")\
+            .execute()
+    
+        await send_episode(context.bot, chat_id, content.data)
+    
         return
 
     # ================= PAYMENT =================
