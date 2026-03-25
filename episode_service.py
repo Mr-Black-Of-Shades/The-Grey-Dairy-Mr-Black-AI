@@ -1,31 +1,36 @@
-from supabase_client import supabase
+from db import get_cursor
 
 
 # ================= GET EPISODE =================
 
 def get_episode(episode_id):
 
-    res = supabase.table("episodes")\
-        .select("*")\
-        .eq("id", episode_id)\
-        .limit(1)\
-        .execute()
+    cur = get_cursor()
 
-    return res.data[0] if res.data else None
+    cur.execute(
+        "SELECT * FROM episodes WHERE id = %s",
+        (episode_id,)
+    )
+
+    return cur.fetchone()
 
 
 # ================= CHECK UNLOCK =================
 
 def is_episode_unlocked(user_id, episode_id):
 
-    res = supabase.table("user_progress")\
-        .select("id")\
-        .eq("user_id", user_id)\
-        .eq("episode_id", episode_id)\
-        .limit(1)\
-        .execute()
+    cur = get_cursor()
 
-    return bool(res.data)
+    cur.execute(
+        """
+        SELECT id 
+        FROM user_progress 
+        WHERE user_id = %s AND episode_id = %s
+        """,
+        (user_id, episode_id)
+    )
+
+    return bool(cur.fetchone())
 
 
 # ================= UNLOCK EPISODE =================
@@ -36,28 +41,35 @@ def unlock_episode(user_id, episode_id):
     if is_episode_unlocked(user_id, episode_id):
         return True
 
+    cur = get_cursor()
 
-    res = supabase.table("user_progress").upsert({
-        "user_id": user_id,
-        "episode_id": episode_id,
-        "unlocked": True
-    }).execute()
+    cur.execute(
+        """
+        INSERT INTO user_progress (user_id, episode_id, unlocked)
+        VALUES (%s, %s, true)
+        ON CONFLICT DO NOTHING
+        """,
+        (user_id, episode_id)
+    )
 
-    return bool(res.data)
+    return True
 
 
 # ================= GET USER CURRENT EPISODE =================
 
 def get_user_current_episode(telegram_id):
 
-    res = supabase.table("users")\
-        .select("current_episode")\
-        .eq("telegram_id", str(telegram_id))\
-        .limit(1)\
-        .execute()
+    cur = get_cursor()
 
-    if res.data:
-        return res.data[0]["current_episode"]
+    cur.execute(
+        "SELECT current_episode FROM users WHERE telegram_id = %s",
+        (str(telegram_id),)
+    )
+
+    res = cur.fetchone()
+
+    if res:
+        return res["current_episode"]
 
     return 1
 
@@ -66,33 +78,50 @@ def get_user_current_episode(telegram_id):
 
 def update_user_episode(telegram_id, episode_id):
 
-    supabase.table("users")\
-        .update({"current_episode": episode_id})\
-        .eq("telegram_id", str(telegram_id))\
-        .execute()
+    cur = get_cursor()
+
+    cur.execute(
+        """
+        UPDATE users 
+        SET current_episode = %s 
+        WHERE telegram_id = %s
+        """,
+        (episode_id, str(telegram_id))
+    )
 
 
 # ================= GET EPISODE CONTENT =================
 
 def get_episode_content(episode_id):
 
-    res = supabase.table("episode_content")\
-        .select("*")\
-        .eq("episode_id", episode_id)\
-        .order("sequence")\
-        .execute()
+    cur = get_cursor()
 
-    return res.data if res.data else []
+    cur.execute(
+        """
+        SELECT * 
+        FROM episode_content 
+        WHERE episode_id = %s 
+        ORDER BY sequence
+        """,
+        (episode_id,)
+    )
+
+    return cur.fetchall()
 
 
 # ================= GET SIDE STORIES =================
 
 def get_side_stories(parent_episode_id):
 
-    res = supabase.table("episodes")\
-        .select("*")\
-        .eq("parent_episode_id", parent_episode_id)\
-        .eq("type", "side")\
-        .execute()
+    cur = get_cursor()
 
-    return res.data if res.data else []
+    cur.execute(
+        """
+        SELECT * 
+        FROM episodes 
+        WHERE parent_episode_id = %s AND type = 'side'
+        """,
+        (parent_episode_id,)
+    )
+
+    return cur.fetchall()
