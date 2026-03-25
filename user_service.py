@@ -1,57 +1,76 @@
-from supabase_client import supabase
+from db import get_cursor
 from datetime import datetime
+
+
+# ================= GET OR CREATE USER =================
 
 def get_or_create_user(telegram_id):
 
-    res = supabase.table("users")\
-        .select("*")\
-        .eq("telegram_id", str(telegram_id))\
-        .limit(1)\
-        .execute()
+    cur = get_cursor()
 
-    if res.data:
-        return res.data[0]
+    # check user
+    cur.execute(
+        "SELECT * FROM users WHERE telegram_id = %s",
+        (str(telegram_id),)
+    )
+    user = cur.fetchone()
 
-    user = supabase.table("users").insert({
-        "telegram_id": str(telegram_id),
-        "current_episode": 1
-    }).execute()
+    if user:
+        return user
 
-    return user.data[0]
+    # create user
+    cur.execute(
+        """
+        INSERT INTO users (telegram_id, current_episode)
+        VALUES (%s, 1)
+        RETURNING *
+        """,
+        (str(telegram_id),)
+    )
+
+    return cur.fetchone()
 
 
-# ✅ Create or update behavior
+# ================= UPDATE USER BEHAVIOR =================
+
 def update_user_behavior(user_id, episode_id=None, drop_off=None):
-    data = {
-        "user_id": user_id,
-        "updated_at": datetime.utcnow().isoformat()
-    }
 
-    if episode_id is not None:
-        data["last_episode_seen"] = episode_id
-    
-    if drop_off is not None:
-        data["drop_off_point"] = drop_off
+    cur = get_cursor()
 
-    data["last_active"] = datetime.utcnow().isoformat()
+    cur.execute(
+        """
+        INSERT INTO user_behavior 
+        (user_id, last_active, updated_at, last_episode_seen, drop_off_point)
+        VALUES (%s, NOW(), NOW(), %s, %s)
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+            last_active = NOW(),
+            updated_at = NOW(),
+            last_episode_seen = COALESCE(EXCLUDED.last_episode_seen, user_behavior.last_episode_seen),
+            drop_off_point = COALESCE(EXCLUDED.drop_off_point, user_behavior.drop_off_point)
+        """,
+        (user_id, episode_id, drop_off)
+    )
 
-    supabase.table("user_behavior").upsert(data).execute()
 
+# ================= GET USER BEHAVIOR =================
 
-# ✅ Get behavior
 def get_user_behavior(user_id):
 
-    res = supabase.table("user_behavior") \
-        .select("*") \
-        .eq("user_id", user_id) \
-        .limit(1) \
-        .execute()
-    
-    return res.data[0] if res.data else None
+    cur = get_cursor()
+
+    cur.execute(
+        "SELECT * FROM user_behavior WHERE user_id = %s",
+        (user_id,)
+    )
+
+    return cur.fetchone()
 
 
-# ✅ USER STATE LOGIC
+# ================= USER STATE LOGIC =================
+
 def get_user_state(user, behavior):
+
     if user.get("total_spent", 0) > 0:
         return "BUYER"
     
@@ -62,4 +81,3 @@ def get_user_state(user, behavior):
         return "HOOKED"
     
     return "CURIOUS"
-
