@@ -3,11 +3,12 @@ from telegram.ext import ContextTypes
 
 from ai_mr_black import generate_voice_line, generate_upsell_line
 from event_service import track_event
-from supabase_client import supabase
+from db import get_cursor
 
 from episode_service import get_episode, unlock_episode, get_episode_content
 from sender import send_episode
 from user_service import update_user_behavior
+
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -16,19 +17,21 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = query.message.chat_id
 
+    # ================= GET USER =================
     try:
-        user_res = supabase.table("users")\
-            .select("id")\
-            .eq("telegram_id", str(chat_id))\
-            .limit(1)\
-            .execute()
+        cur = get_cursor()
+        cur.execute(
+            "SELECT id FROM users WHERE telegram_id = %s",
+            (str(chat_id),)
+        )
+        user_res = cur.fetchone()
     except:
         return
     
-    if not user_res.data:
+    if not user_res:
         return
     
-    user_id = user_res.data[0]["id"]
+    user_id = user_res["id"]
     
     data = query.data
 
@@ -98,6 +101,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         return
 
+
     # ================= PAYMENT =================
     if data.startswith("pay_"):
 
@@ -117,6 +121,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Payment system coming next..."
         )
         return
+
 
     # ================= MICRO =================
     if data.startswith("micro_"):
