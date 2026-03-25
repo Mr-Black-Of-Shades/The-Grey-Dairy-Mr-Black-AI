@@ -1,30 +1,36 @@
 from datetime import datetime, timedelta
-from supabase_client import supabase
+from db import get_cursor
 from ai_mr_black import generate_state_line
+
 
 async def reengage_users(bot):
 
-    users = supabase.table("user_behavior").select("*").execute().data
+    cur = get_cursor()
+
+    # get all user behaviors
+    cur.execute("SELECT * FROM user_behavior")
+    users = cur.fetchall()
 
     for u in users:
 
-        last_active = datetime.fromisoformat(u["last_active"])
+        last_active = u["last_active"]
 
         if datetime.utcnow() - last_active > timedelta(hours=24):
 
             user_id = u["user_id"]
 
             # get telegram_id
-            res = supabase.table("users") \
-                .select("telegram_id") \
-                .eq("id", user_id) \
-                .limit(1) \
-                .execute()
+            cur.execute(
+                "SELECT telegram_id FROM users WHERE id = %s",
+                (user_id,)
+            )
 
-            if not res.data:
+            res = cur.fetchone()
+
+            if not res:
                 continue
 
-            chat_id = res.data[0]["telegram_id"]
+            chat_id = res["telegram_id"]
 
             msg = generate_state_line("DORMANT")
 
