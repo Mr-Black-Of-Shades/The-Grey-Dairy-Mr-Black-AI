@@ -45,3 +45,124 @@ async def webhook(req: Request):
     await telegram_app.process_update(update)
 
     return {"ok": True}
+
+
+# ================= STUDIO APIs =================
+
+from pydantic import BaseModel
+from typing import Literal
+from db import get_cursor
+
+
+# ---------- REQUEST MODELS ----------
+
+class EpisodeCreate(BaseModel):
+    title: str
+    type: Literal["main", "side", "fan"]
+    price: int = 0
+    character_id: str
+    parent_episode_id: int | None = None
+
+
+class ContentCreate(BaseModel):
+    episode_id: int
+    type: Literal["text", "photo", "video"]
+    content: str
+    sequence: int | None = None
+
+
+# ---------- CREATE EPISODE ----------
+
+@app.post("/studio/episode/create")
+async def create_episode(data: EpisodeCreate):
+
+    try:
+        cur = get_cursor()
+
+        cur.execute(
+            """
+            INSERT INTO episodes (title, type, price, character_id, parent_episode_id)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                data.title,
+                data.type,
+                data.price,
+                data.character_id,
+                data.parent_episode_id
+            )
+        )
+
+        res = cur.fetchone()
+
+        return {
+            "success": True,
+            "episode_id": res["id"]
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ---------- ADD CONTENT ----------
+
+@app.post("/studio/content/add")
+async def add_content(data: ContentCreate):
+
+    try:
+        cur = get_cursor()
+
+        # AUTO SEQUENCE IF NOT PROVIDED
+        if data.sequence is None:
+            cur.execute(
+                """
+                SELECT COALESCE(MAX(sequence), 0) + 1 AS next_seq
+                FROM episode_content
+                WHERE episode_id = %s
+                """,
+                (data.episode_id,)
+            )
+            seq = cur.fetchone()["next_seq"]
+        else:
+            seq = data.sequence
+
+        cur.execute(
+            """
+            INSERT INTO episode_content (episode_id, type, content, sequence)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                data.episode_id,
+                data.type,
+                data.content,
+                seq
+            )
+        )
+
+        return {"success": True}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ---------- GET EPISODES ----------
+
+@app.get("/studio/episode/list")
+async def get_episodes():
+
+    try:
+        cur = get_cursor()
+
+        cur.execute(
+            """
+            SELECT id, title, type, price
+            FROM episodes
+            ORDER BY id DESC
+            """
+        )
+
+        return cur.fetchall()
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
