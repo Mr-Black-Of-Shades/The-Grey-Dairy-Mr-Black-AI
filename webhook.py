@@ -2,13 +2,22 @@ from fastapi import FastAPI, Request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 
-from config import BOT_TOKEN
+from config import BOT_TOKEN, WEBHOOK_URL
 from handlers import start, handle_next
 from callbacks import handle_buttons
 
-import os
+from payments import router as payment_router  # 💰 NEW
+
+from pydantic import BaseModel
+from typing import Literal
+from db import get_cursor
+
 
 app = FastAPI()
+
+# 💰 include payment routes
+app.include_router(payment_router)
+
 
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
@@ -25,8 +34,6 @@ telegram_app.add_handler(CallbackQueryHandler(handle_buttons))
 @app.on_event("startup")
 async def startup():
     await telegram_app.initialize()
-
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
     await telegram_app.bot.set_webhook(
         url=f"{WEBHOOK_URL}/webhook"
@@ -48,10 +55,6 @@ async def webhook(req: Request):
 
 
 # ================= STUDIO APIs =================
-
-from pydantic import BaseModel
-from typing import Literal
-from db import get_cursor
 
 
 # ---------- REQUEST MODELS ----------
@@ -113,7 +116,7 @@ async def add_content(data: ContentCreate):
     try:
         cur = get_cursor()
 
-        # AUTO SEQUENCE IF NOT PROVIDED
+        # AUTO SEQUENCE
         if data.sequence is None:
             cur.execute(
                 """
