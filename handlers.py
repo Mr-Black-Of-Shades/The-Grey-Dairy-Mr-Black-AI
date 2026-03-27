@@ -172,3 +172,24 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "You can stop here… or continue.",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+
+    # ================= FAN ZONE TRIGGER =================
+    
+    if next_episode_id >= 3:
+    
+        await context.bot.send_message(
+            chat_id,
+            generate_line("There’s something else… something hidden.")
+        )
+    
+        await context.bot.send_message(
+            chat_id,
+            "Not everyone tells the same story.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(
+                    "Enter Fan Zone",
+                    callback_data=f"fan_{episode['character_id']}"
+                )]
+            ])
+        )
