@@ -111,6 +111,43 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
+    # ================= FAN ZONE =================
+    if data.startswith("fan_"):
+    
+        character_id = data.split("_")[1]
+    
+        from episode_service import get_fan_episodes
+    
+        fan_episodes = get_fan_episodes(character_id)
+    
+        if not fan_episodes:
+            await context.bot.send_message(
+                chat_id,
+                "Nothing here... yet."
+            )
+            return
+    
+        buttons = []
+    
+        for ep in fan_episodes:
+            buttons.append([
+                InlineKeyboardButton(
+                    f"{ep['title']} (₹{ep['price']})",
+                    callback_data=f"side_{ep['id']}"
+                )
+            ])
+    
+        buttons.append([InlineKeyboardButton("Back", callback_data="next")])
+    
+        await context.bot.send_message(
+            chat_id,
+            "This is where their story changes…",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+    
+        return
+
+    
     # ================= PAYMENT (UPGRADED) =================
     if data.startswith("pay_"):
 
