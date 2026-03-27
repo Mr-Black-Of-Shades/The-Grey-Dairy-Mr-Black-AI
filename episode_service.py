@@ -125,3 +125,21 @@ def get_side_stories(parent_episode_id):
     )
 
     return cur.fetchall()
+    
+
+# ================= GET FAN EPISODES =================
+
+def get_fan_episodes(character_id):
+
+    cur = get_cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM episodes
+        WHERE character_id = %s AND type = 'fan'
+        """,
+        (character_id,)
+    )
+
+    return cur.fetchall()
