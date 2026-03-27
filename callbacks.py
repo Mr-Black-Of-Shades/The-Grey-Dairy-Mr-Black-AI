@@ -64,13 +64,11 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         episode = get_episode(side_episode_id)
     
-        # track click
         track_event(user_id, "side_story_click", {
             "episode_id": side_episode_id,
             "character_id": episode["character_id"]
         })
     
-        # if paid
         if episode["price"] > 0:
             await context.bot.send_message(
                 chat_id,
@@ -84,7 +82,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
     
-        # free story
         unlock_episode(user_id, side_episode_id)
 
         update_user_behavior(
@@ -114,7 +111,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-    # ================= PAYMENT (REAL) =================
+    # ================= PAYMENT (UPGRADED) =================
     if data.startswith("pay_"):
 
         episode_id = int(data.replace("pay_", ""))
@@ -127,40 +124,48 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "amount": amount
         })
 
-        # 🔥 AI upsell before payment
+        # 🔥 AI upsell
         upsell = generate_upsell_line()
         await context.bot.send_message(chat_id, upsell)
 
         try:
-            # CREATE ORDER
-            order = razorpay_client.order.create({
-                "amount": amount * 100,  # convert to paisa
+            # ================= CREATE PAYMENT LINK =================
+            payment = razorpay_client.payment_link.create({
+                "amount": amount * 100,
                 "currency": "INR",
-                "payment_capture": 1
+                "description": f"Unlock Episode {episode_id}",
+                "customer": {
+                    "name": f"user_{user_id}",
+                    "email": "user@example.com"
+                },
+                "notify": {
+                    "sms": False,
+                    "email": False
+                },
+                "reminder_enable": True
             })
 
-            order_id = order["id"]
+            payment_link_id = payment["id"]
+            payment_link_url = payment["short_url"]
 
-            # SAVE PAYMENT (PENDING)
+            # ================= SAVE TO DB =================
             cur = get_cursor()
             cur.execute(
                 """
                 INSERT INTO payments (user_id, episode_id, amount, status, razorpay_order_id, character_id)
                 VALUES (%s, %s, %s, 'pending', %s, %s)
                 """,
-                (user_id, episode_id, amount, order_id, episode["character_id"])
+                (user_id, episode_id, amount, payment_link_id, episode["character_id"])
             )
 
-            # PAYMENT LINK (TEMP SIMPLE)
-            payment_link = f"https://rzp.io/l/{order_id}"
-
+            # ================= SEND LINK =================
             await context.bot.send_message(
                 chat_id,
-                f"🔓 Complete your payment:\n{payment_link}"
+                f"🔓 Complete your payment:\n{payment_link_url}"
             )
 
         except Exception as e:
-            print("PAYMENT ERROR:", e)
+            print("PAYMENT LINK ERROR:", e)
 
             await context.bot.send_message(
                 chat_id,
