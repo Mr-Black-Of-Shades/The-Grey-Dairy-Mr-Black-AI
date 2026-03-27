@@ -37,7 +37,10 @@ async def payment_webhook(request: Request, x_razorpay_signature: str = Header(N
     payment_data = payload["payload"]["payment"]["entity"]
 
     razorpay_payment_id = payment_data["id"]
-    razorpay_order_id = payment_data["order_id"]
+
+    # ✅ IMPORTANT CHANGE
+    payment_link_id = payment_data.get("payment_link_id")
+
     amount = payment_data["amount"] // 100
 
     cur = get_cursor()
@@ -45,11 +48,12 @@ async def payment_webhook(request: Request, x_razorpay_signature: str = Header(N
     # ================= FIND PAYMENT =================
     cur.execute(
         "SELECT * FROM payments WHERE razorpay_order_id = %s",
-        (razorpay_order_id,)
+        (payment_link_id,)
     )
     payment = cur.fetchone()
 
     if not payment:
+        print("Payment not found for payment_link_id:", payment_link_id)
         return {"status": "not_found"}
 
     user_id = payment["user_id"]
@@ -83,7 +87,7 @@ async def payment_webhook(request: Request, x_razorpay_signature: str = Header(N
             razorpay_payment_id,
             character_earning,
             platform_earning,
-            razorpay_order_id
+            payment_link_id
         )
     )
 
