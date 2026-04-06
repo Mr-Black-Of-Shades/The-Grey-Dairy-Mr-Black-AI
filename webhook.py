@@ -8,7 +8,7 @@ from telegram.ext import (
     filters
 )
 
-from config import BOT_TOKEN, WEBHOOK_URL
+from config import BOT_TOKEN, WEBHOOK_URL, ADMIN_SECRET
 from handlers import start, handle_next
 from callbacks import handle_buttons
 
@@ -37,8 +37,20 @@ telegram_app.add_handler(CallbackQueryHandler(handle_buttons))
 # 🖤 MEDIA CAPTURE HANDLER (NEW)
 async def capture_media(update: Update, context):
 
+    # 🔒 CHECK USER
+    user_id = str(update.effective_user.id)
+
+    # ❌ BLOCK NON-ADMIN
+    if user_id not in ADMIN_SECRET:
+        return
+
+    # 🔒 ONLY PRIVATE CHAT
+    if update.effective_chat.type != "private":
+        return
+
     cur = get_cursor()
 
+    # 🎬 VIDEO
     if update.message.video:
         file_id = update.message.video.file_id
 
@@ -47,8 +59,9 @@ async def capture_media(update: Update, context):
             (file_id, "video")
         )
 
-        await update.message.reply_text("✅ Video saved to library")
+        await update.message.reply_text("✅ Video saved")
 
+    # 🖼️ IMAGE
     elif update.message.photo:
         file_id = update.message.photo[-1].file_id
 
@@ -57,7 +70,7 @@ async def capture_media(update: Update, context):
             (file_id, "photo")
         )
 
-        await update.message.reply_text("✅ Image saved to library")
+        await update.message.reply_text("✅ Image saved")
 
 
 # 🔥 REGISTER MEDIA HANDLER
