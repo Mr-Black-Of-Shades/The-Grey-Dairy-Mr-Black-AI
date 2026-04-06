@@ -11,3 +11,7 @@ RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
 # 🌐 Webhook
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+# Admin Secret
+ADMIN_SECRET = os.getenv("ADMIN_SECRET")
+
