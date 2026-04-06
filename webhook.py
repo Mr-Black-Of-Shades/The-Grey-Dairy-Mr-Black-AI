@@ -1,12 +1,18 @@
 from fastapi import FastAPI, Request
 from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters
+)
 
 from config import BOT_TOKEN, WEBHOOK_URL
 from handlers import start, handle_next
 from callbacks import handle_buttons
 
-from payments import router as payment_router  # 💰 NEW
+from payments import router as payment_router
 
 from pydantic import BaseModel
 from typing import Literal
@@ -18,7 +24,6 @@ app = FastAPI()
 # 💰 include payment routes
 app.include_router(payment_router)
 
-
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 
@@ -27,6 +32,38 @@ telegram_app = Application.builder().token(BOT_TOKEN).build()
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CallbackQueryHandler(handle_next, pattern="^next$"))
 telegram_app.add_handler(CallbackQueryHandler(handle_buttons))
+
+
+# 🖤 MEDIA CAPTURE HANDLER (NEW)
+async def capture_media(update: Update, context):
+
+    cur = get_cursor()
+
+    if update.message.video:
+        file_id = update.message.video.file_id
+
+        cur.execute(
+            "INSERT INTO media_files (file_id, type) VALUES (%s, %s)",
+            (file_id, "video")
+        )
+
+        await update.message.reply_text("✅ Video saved to library")
+
+    elif update.message.photo:
+        file_id = update.message.photo[-1].file_id
+
+        cur.execute(
+            "INSERT INTO media_files (file_id, type) VALUES (%s, %s)",
+            (file_id, "photo")
+        )
+
+        await update.message.reply_text("✅ Image saved to library")
+
+
+# 🔥 REGISTER MEDIA HANDLER
+telegram_app.add_handler(
+    MessageHandler(filters.VIDEO | filters.PHOTO, capture_media)
+)
 
 
 # ================= STARTUP =================
@@ -42,7 +79,7 @@ async def startup():
     print("Webhook set successfully")
 
 
-# ================= WEBHOOK ENDPOINT =================
+# ================= WEBHOOK =================
 
 @app.post("/webhook")
 async def webhook(req: Request):
@@ -57,7 +94,7 @@ async def webhook(req: Request):
 # ================= STUDIO APIs =================
 
 
-# ---------- REQUEST MODELS ----------
+# ---------- MODELS ----------
 
 class EpisodeCreate(BaseModel):
     title: str
@@ -67,11 +104,9 @@ class EpisodeCreate(BaseModel):
     parent_episode_id: int | None = None
 
 
-class ContentCreate(BaseModel):
+class ContentSave(BaseModel):
     episode_id: int
-    type: Literal["text", "photo", "video"]
-    content: str
-    sequence: int | None = None
+    blocks: list
 
 
 # ---------- CREATE EPISODE ----------
@@ -108,42 +143,82 @@ async def create_episode(data: EpisodeCreate):
         return {"success": False, "error": str(e)}
 
 
-# ---------- ADD CONTENT ----------
+# ---------- SAVE FULL CONTENT (NEW CORE API) ----------
 
-@app.post("/studio/content/add")
-async def add_content(data: ContentCreate):
+@app.post("/studio/content/save")
+async def save_content(data: ContentSave):
 
     try:
         cur = get_cursor()
 
-        # AUTO SEQUENCE
-        if data.sequence is None:
+        # DELETE old
+        cur.execute(
+            "DELETE FROM episode_content WHERE episode_id = %s",
+            (data.episode_id,)
+        )
+
+        # INSERT new
+        for i, block in enumerate(data.blocks, start=1):
             cur.execute(
                 """
-                SELECT COALESCE(MAX(sequence), 0) + 1 AS next_seq
-                FROM episode_content
-                WHERE episode_id = %s
+                INSERT INTO episode_content (episode_id, type, content, sequence)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (data.episode_id,)
+                (
+                    data.episode_id,
+                    block["type"],
+                    block.get("content"),
+                    i
+                )
             )
-            seq = cur.fetchone()["next_seq"]
-        else:
-            seq = data.sequence
+
+        return {"success": True}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ---------- GET CONTENT ----------
+
+@app.get("/studio/content/{episode_id}")
+async def get_content(episode_id: int):
+
+    try:
+        cur = get_cursor()
 
         cur.execute(
             """
-            INSERT INTO episode_content (episode_id, type, content, sequence)
-            VALUES (%s, %s, %s, %s)
+            SELECT id, type, content, sequence
+            FROM episode_content
+            WHERE episode_id = %s
+            ORDER BY sequence
             """,
-            (
-                data.episode_id,
-                data.type,
-                data.content,
-                seq
-            )
+            (episode_id,)
         )
 
-        return {"success": True}
+        return cur.fetchall()
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ---------- MEDIA LIST ----------
+
+@app.get("/studio/media")
+async def get_media():
+
+    try:
+        cur = get_cursor()
+
+        cur.execute(
+            """
+            SELECT id, file_id, type
+            FROM media_files
+            ORDER BY id DESC
+            """
+        )
+
+        return cur.fetchall()
 
     except Exception as e:
         return {"success": False, "error": str(e)}
