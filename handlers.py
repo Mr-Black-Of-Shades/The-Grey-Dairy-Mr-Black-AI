@@ -6,7 +6,8 @@ from user_service import (
     get_or_create_user,
     get_user_behavior,
     get_user_state,
-    update_user_behavior
+    update_user_behavior,
+    has_active_subscription
 )
 
 from episode_service import (
@@ -21,12 +22,22 @@ from sender import send_episode
 from event_service import track_event
 from ai_mr_black import generate_line, generate_state_line
 
+from db import get_cursor
+
+
+# ================= START =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
 
     user = get_or_create_user(chat_id)
+
+    # 🔄 refresh latest user state
+    cur = get_cursor()
+    cur.execute("SELECT * FROM users WHERE id = %s", (user["id"],))
+    user = cur.fetchone()
+
     track_event(user["id"], "session_start")
 
     behavior = get_user_behavior(user["id"])
@@ -68,13 +79,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ================= NEXT =================
+
 async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
     await query.answer()
 
     chat_id = query.message.chat_id
+
     user = get_or_create_user(chat_id)
+
+    # 🔄 refresh latest user state (IMPORTANT)
+    cur = get_cursor()
+    cur.execute("SELECT * FROM users WHERE id = %s", (user["id"],))
+    user = cur.fetchone()
 
     next_episode_id = user["current_episode"] + 1
     episode = get_episode(next_episode_id)
@@ -83,7 +102,35 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id, "No more story...")
         return
 
-    # ================= LOCK =================
+
+    # ================= MAIN STORY (SUBSCRIPTION) =================
+
+    if episode["type"] == "main" and next_episode_id > 1:
+
+        if not has_active_subscription(user):
+
+            update_user_behavior(user_id=user["id"], drop_off="subscription")
+
+            await context.bot.send_chat_action(chat_id, "typing")
+            await context.bot.send_message(chat_id, generate_state_line("HESITANT"))
+
+            track_event(user["id"], "hit_subscription_paywall", {
+                "episode_id": next_episode_id
+            })
+
+            keyboard = [
+                [InlineKeyboardButton("🖤 Unlock Full Story (₹199/month)", callback_data="subscribe")]
+            ]
+
+            await context.bot.send_message(
+                chat_id,
+                "This is where the real story begins.\n\nUnlimited access. No interruptions.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+
+
+    # ================= SIDE / FAN (ONE-TIME) =================
 
     if episode["price"] > 0 and not is_episode_unlocked(user["id"], next_episode_id):
 
@@ -96,11 +143,10 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "episode_id": next_episode_id
         })
 
-        price = 49 if next_episode_id == 2 else episode["price"]
+        price = episode["price"]
 
         keyboard = [
-            [InlineKeyboardButton(f"🔓 Continue (₹{price})", callback_data=f"pay_{next_episode_id}")],
-            [InlineKeyboardButton("👁 See what you missed (₹49)", callback_data=f"micro_{next_episode_id}")]
+            [InlineKeyboardButton(f"🔓 Continue (₹{price})", callback_data=f"pay_{next_episode_id}")]
         ]
 
         await context.bot.send_message(
@@ -109,6 +155,7 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
+
 
     # ================= PLAY =================
 
@@ -126,6 +173,7 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await asyncio.sleep(1)
+
 
     # ================= SIDE STORIES =================
 
@@ -147,7 +195,6 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         buttons = []
 
-        # 🔥 side first (money first)
         for side in side_stories:
             buttons.append([
                 InlineKeyboardButton(
@@ -174,15 +221,15 @@ async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-    # ================= FAN ZONE TRIGGER =================
-    
+    # ================= FAN ZONE =================
+
     if next_episode_id >= 3:
-    
+
         await context.bot.send_message(
             chat_id,
             generate_line("There’s something else… something hidden.")
         )
-    
+
         await context.bot.send_message(
             chat_id,
             "Not everyone tells the same story.",
