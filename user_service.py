@@ -81,3 +81,26 @@ def get_user_state(user, behavior):
         return "HOOKED"
     
     return "CURIOUS"
+
+
+# ================= USER SUBSCRIPTION LOGIC =================
+
+def has_active_subscription(user):
+
+    # no subscription
+    if not user.get("subscription_status"):
+        return False
+
+    if user["subscription_status"] != "active":
+        return False
+
+    expiry = user.get("subscription_expiry")
+
+    if not expiry:
+        return False
+
+    # expired
+    if expiry < datetime.utcnow():
+        return False
+
+    return True
