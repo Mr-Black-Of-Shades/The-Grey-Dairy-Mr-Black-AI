@@ -39,15 +39,31 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_res = cur.fetchone()
     except:
         return
-    
+
     if not user_res:
         return
-    
+
     user_id = user_res["id"]
-    
+
     data = query.data
 
-   
+
+    # ================= SUBSCRIPTION CLICK (NEW) =================
+    if data == "subscribe":
+
+        track_event(user_id, "click_subscribe")
+
+        await context.bot.send_message(
+            chat_id,
+            "🖤 Subscription is being prepared...\n\nThis will unlock the full story."
+        )
+
+        # 👉 NEXT STEP: Razorpay subscription will go here
+        # (we implement in Step 3)
+
+        return
+
+
     # ================= SKIP =================
     if data == "skip":
         await context.bot.send_message(
@@ -59,16 +75,16 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ================= SIDE STORY CLICK =================
     if data.startswith("side_"):
-    
+
         side_episode_id = int(data.split("_")[1])
-    
+
         episode = get_episode(side_episode_id)
-    
+
         track_event(user_id, "side_story_click", {
             "episode_id": side_episode_id,
             "character_id": episode["character_id"]
         })
-    
+
         if episode["price"] > 0:
             await context.bot.send_message(
                 chat_id,
@@ -81,7 +97,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ])
             )
             return
-    
+
         unlock_episode(user_id, side_episode_id)
 
         update_user_behavior(
@@ -89,15 +105,14 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             episode_id=side_episode_id,
             drop_off="side_story"
         )
-    
+
         track_event(user_id, "side_story_unlock", {
             "episode_id": side_episode_id,
             "character_id": episode["character_id"]
         })
-    
 
         content = get_episode_content(side_episode_id)
-        
+
         await send_episode(context.bot, chat_id, content)
 
         await context.bot.send_message(
@@ -107,28 +122,28 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("Continue", callback_data="next")]
             ])
         )
-    
+
         return
 
 
     # ================= FAN ZONE =================
     if data.startswith("fan_"):
-    
+
         character_id = data.split("_")[1]
-    
+
         from episode_service import get_fan_episodes
-    
+
         fan_episodes = get_fan_episodes(character_id)
-    
+
         if not fan_episodes:
             await context.bot.send_message(
                 chat_id,
                 "Nothing here... yet."
             )
             return
-    
+
         buttons = []
-    
+
         for ep in fan_episodes:
             buttons.append([
                 InlineKeyboardButton(
@@ -136,19 +151,19 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     callback_data=f"side_{ep['id']}"
                 )
             ])
-    
+
         buttons.append([InlineKeyboardButton("Back", callback_data="next")])
-    
+
         await context.bot.send_message(
             chat_id,
             "This is where their story changes…",
             reply_markup=InlineKeyboardMarkup(buttons)
         )
-    
+
         return
 
-    
-    # ================= PAYMENT (UPGRADED) =================
+
+    # ================= PAYMENT =================
     if data.startswith("pay_"):
 
         episode_id = int(data.replace("pay_", ""))
@@ -161,12 +176,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "amount": amount
         })
 
-        # 🔥 AI upsell
         upsell = generate_upsell_line()
         await context.bot.send_message(chat_id, upsell)
 
         try:
-            # ================= CREATE PAYMENT LINK =================
             payment = razorpay_client.payment_link.create({
                 "amount": amount * 100,
                 "currency": "INR",
@@ -185,7 +198,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             payment_link_id = payment["id"]
             payment_link_url = payment["short_url"]
 
-            # ================= SAVE TO DB =================
             cur = get_cursor()
             cur.execute(
                 """
@@ -195,7 +207,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 (user_id, episode_id, amount, payment_link_id, episode["character_id"])
             )
 
-            # ================= SEND LINK =================
             await context.bot.send_message(
                 chat_id,
                 f"🔓 Complete your payment:\n{payment_link_url}"
@@ -216,7 +227,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("micro_"):
 
         track_event(user_id, "click_micro")
-        
+
         upsell = generate_upsell_line()
         await context.bot.send_message(chat_id, upsell)
 
